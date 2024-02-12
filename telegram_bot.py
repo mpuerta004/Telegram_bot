@@ -939,6 +939,9 @@ def crear_mapa(message):
                     grupos = df.groupby(['latitud', 'longitud'])[
                         'url_imagen'].apply(list).reset_index()
                     campaign=bot_auxiliar.get_campaign_hive_1(id_user=message.chat.id)
+                    if campaign is None:
+                        bot.reply_to("Error in the visualizacion. Perhaps there is no active campaign. Please contact with @Maite314")
+                        return None
                     radio=campaign['cells_distance']/2
                     hipotenusa= math.sqrt(2*((radio)**2))
                     for index, row in grupos.iterrows():
