@@ -9,10 +9,8 @@ import folium
 from folium import plugins
 from IPython.display import display
 import csv
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 import math
 from math import asin, atan2, cos, degrees, radians, sin, sqrt
-from PIL import Image
 
 # #https://api.telegram.org/bot<TU_TOKEN/getUpdates
 # #https://api.telegram.org/bot<TU_TOKEN>/getMe
