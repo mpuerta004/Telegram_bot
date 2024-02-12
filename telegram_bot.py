@@ -15,17 +15,34 @@ import pandas as pd
 from folium import plugins
 from folium.utilities import image_to_url
 import subprocess
+from fastapi_utils.session import FastAPISessionMaker
+from fastapi import (APIRouter, Depends,
+                     HTTPException, Query)
+
+
+import deps
+
+SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql:3307/Telegram_bot_db"
+sessionmaker = FastAPISessionMaker(SQLALCHEMY_DATABASE_URL)
+import crud
+from schemas.Member import MemberCreate, MemberUpdate, MemberSearchResults
+from schemas.Recommendation import RecommendationCreate, RecommendationUpdate, RecommendationSearchResults
+from schemas.last_user_position import Last_user_positionCreate, Last_user_positionUpdate, Last_user_positionSearchResults
 
 
 # Ponemos nuestro Token generado con el @BotFather
 TOKEN = "6738738196:AAFVC0OT3RAv4PJvHsV4Vj9zYIlulIlnPLw"
 # Creamos nuestra instancia "bot" a partir de ese TOKEN
 bot = telebot.TeleBot(TOKEN)
-# #https://api.telegram.org/bot<TU_TOKEN/getUpdates
-# #https://api.telegram.org/bot<TU_TOKEN>/getMe
 api_url = 'http://localhost:8001'
+
+#Variables para recordar ele stado de las cosas!
 last_recomendation_per_user = {}
 last_location_of_user = {}
+recomendation_aceptada = {}
+
+#MEnsajes determinados 
+message_goal_of_the_system={"The goal of this system is create a collage of our neighborhood.This system will ask you to go to different places in the neighborhood and take pictures that catch your attention in that place."}
 message_change_personal_information = ("Also you can modify your personal information (if you want) using the following commands:\n" +
                                        "/setname [YOUR NAME] -> to set your name, \n"
                                        "/setsurname  [YOUR SURNAME] -> to set your surname, \n" +
@@ -33,6 +50,7 @@ message_change_personal_information = ("Also you can modify your personal inform
                                        "/setmail [YOUR EMAIL] -> to set your email, \n" +
                                        "/setgender [NOBINARY or MALE or FEMALE or NOANSWER] -> to set your gender. \n" +
                                        "This information can be changed anytime using these commands.")
+
 message_info_interaction = ("The goal of this system is to create a map of picture taken in diferentes places of Deusto. To create a map of the Deusto as pictures of Deusto. This system give you some recomendation of places to take photos and create a map of photos."+
                             "You can interact with me using the following commands:\n" +
                             "/recommendation -> to request places to take a photo, \n" +
@@ -40,99 +58,45 @@ message_info_interaction = ("The goal of this system is to create a map of pictu
                             "/map -> to see the map of the places with the photos \n" )
                             
 
-recomendation_aceptada = {}
 headers = {
     'Accept': 'application/json',
     'Content-Type': 'application/json'
 }
 
 
-# TODO poner la opcion de que el usario pueda poner todos sus datos personales de una vez
-
 # Manejar el comando /start ->
 @bot.message_handler(commands=['start'])
 def start(message):
-
-    headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
     # We want to look if the user is already in the database or not!
     peticion = api_url + f'/members/{message.chat.id}'
-    response = None
     try:
         response = requests.get(peticion, headers=headers)
         # If the answer is 200 -> the user is already in the database
         # CASE (user exists in the database).
         if response.status_code == 200:
             data = response.json()  # data -> user information -> Member
-            bot.send_message(
-                message.chat.id, f"Hello {message.chat.first_name}! Welcome back!")
+            db= Depends(deps.get_db)
+            Member= MemberCreate(id=message.chat.id, name=message.chat.first_name,surname="",age=0, gender="NOANSWER", city="", mail=message.chat.username, birthday=datetime.datetime.now())
+            crud.member.create_member(db=db, member=Member)
+            bot.send_message(message.chat.id, f"Hello {message.chat.first_name}! Welcome back!")
+            bot.send_message(message.chat.id, message_goal_of_the_system)
             bot.send_message(message.chat.id, message_info_interaction)
             bot.send_message(message.chat.id, message_change_personal_information)
         # CASE (user dont exists in the database).
         else:
-            # TODO igual aqui se le pueden hacer algunas preguntas para que diga sus datos personales!
-            # We insert in the database.
-            peticion = api_url + '/sync/hives/1/members/'
-            payload = [
-                {
-                    "member": {
-                        "name": message.chat.first_name,
-                        "surname": "",
-                        "age": 0,
-                        "gender": "NOANSWER",
-                        "city": "",
-                        "mail": "",
-                        "birthday": "2024-01-11T16:09:59",
-                        "real_user": True,
-                        "id": message.chat.id
-                    },
-                    "role": "WorkerBee"
-                }
-            ]
-            # Put endpoint to integrate the information of the user in the datases
-            response = requests.put(peticion, headers=headers,
-                                        json=payload)
-            # Verificar el código de respuesta
-            # We insert the user correctly in the database,
-            if response.status_code == 201:
-                # La solicitud fue exitosa
-                data = response.json()  # Si la respuesta es JSON
+            data=bot_auxiliar.add_user(message=message)
+            if data is not None:
                 # We have to insert a device in the dataset for the user and also relate the user with the device.
-                peticion = api_url + "/devices"
-                info_device = {
-                    "description": "string",
-                    "brand": "string",
-                    "model": "string",
-                    "year": "string"
-                }
-                # Post a new device in the dataset.
-                response = requests.post(
-                peticion, headers=headers, json=info_device)
-                    # IF the device is correctly inserted in the dataset.
-                if response.status_code == 201:
-                    data = response.json()  # Si la respuesta es JSON
+                data=bot_auxiliar.add_device()
+                if data is not None:
+                    data=bot_auxiliar.add_member_device(member_id=message.chat.id, device_id=data['id'])
                     # We insert in the database the Member_Device entity.
-                    info_device_member = {
-                            "member_id": message.chat.id,
-                            "device_id": data['id'],
-                        }
-                    # TODO igual el 1 de campaign no funciona
-                    peticion = api_url + f"/sync/hives/1/campaigns/1/devices"
-                    response = None
-                    response = requests.put(
-                                peticion, headers=headers, json=info_device_member)
-                    
-                    # If we insert corretlly the user, the devide and the relation between them.
-                    if response.status_code == 201:
-                        # La solicitud fue exitosa
-                        data = response.json()  # Si la respuesta es JSON
+                    if data is not None:
                         bot.send_message(
                                 message.chat.id, f"Hello! Nice to meet you {message.chat.first_name}!")
+                        bot.send_message(message.chat.id, message_goal_of_the_system)
                         bot.send_message(message.chat.id, message_info_interaction)
-                        bot.send_message(
-                                message.chat.id, message_change_personal_information)
+                        bot.send_message(message.chat.id, message_change_personal_information)
                     else:
                         print(
                                 f"Error en la solicitud. Código de respuesta: {response.status_code}")       
@@ -140,15 +104,13 @@ def start(message):
                         print(
                                 f"Error en la solicitud. Código de respuesta: {response.status_code}")       
             else:
-                        print(
-                                f"Error en la solicitud. Código de respuesta: {response.status_code}")            
+                print(f"Error en la solicitud. Código de respuesta: {response.status_code}")    
                         
+                
     except Exception as e:
-                print("Error durante la conexion con la base de datos:", e)
-                return None
+        print("Error durante la conexion con la base de datos:", e)
+        return None
            
-       
-
 
 # command /setname.
 @bot.message_handler(commands=['setname'])
@@ -643,16 +605,25 @@ def set_city(message):
 def recibir_localizacion(message):
     markup = types.ReplyKeyboardMarkup(row_width=1)
     location_btn = types.KeyboardButton(
-        "Compartir ubicación", request_location=True)
+        "Share location", request_location=True)
     markup.add(location_btn)
     bot.send_message(
         message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
+    db = Depends(deps.get_db)
+    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+    crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
 
-
+    
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
     user = bot_auxiliar.existe_user(message.chat.id)
     if user is not None:
+        db = Depends(deps.get_db)
+        
+        last_location_of_user= Last_user_positionCreate(id=message.chat.id, location={
+                'Longitude': message.location.longitude, 'Latitude': message.location.latitude})
+        crud.last_user_position.create_last_user_position(db=db, last_user_position=last_location_of_user)
+        
         info = {
             "member_current_location": {
                 "Longitude": message.location.longitude,
@@ -662,7 +633,8 @@ def handle_location(message):
         rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
         # El usuario tiene recomendaciones aceptadas!
         if rec is not None:
-            bot.reply_to(message, "It's time for you to send the photo!")
+            bot.reply_to(message, "It's time for you to send the photo! Plese send to me the photo to integrate in the collague.")
+            
         else:
             # En caso de no tener ninguna recomendacion aceptada -> creamos una.
             campaign = bot_auxiliar.get_campaign_hive_1(message.chat.id)
@@ -706,6 +678,7 @@ def handle_location(message):
                                           'centre']['Latitude'], longitude=data['results'][1]['cell']['centre']['Longitude'])
                         bot.send_message(
                             message.chat.id, "Please choose from the menu where you want to take the photo.", reply_markup=markup)
+
                     else:
                         markup = types.ReplyKeyboardMarkup(row_width=1)
                         option1 = types.KeyboardButton(f"Option {1} ")
@@ -725,6 +698,9 @@ def handle_location(message):
                                           'centre']['Latitude'], longitude=data['results'][2]['cell']['centre']['Longitude'])
                         bot.send_message(
                             message.chat.id, "Please choose from the menu where you want to take the photo.", reply_markup=markup)
+                    db = Depends(deps.get_db)
+                    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+                    crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
                 else:
                     bot.reply_to(
                         message, "There are no possible recommendations for you at this time. We're sorry.")
@@ -743,32 +719,40 @@ def handle_option(message):
     if last_recomendation_per_user[message.chat.id] is not None:
         # Asegurate que sigue activa la recomendacion es decir si tiene aceptadas y no las ha realizado hay que corregiirlo.
         number = message.text.replace('Option ', '').strip()
-
-        recomendation_aceptada[message.chat.id] = int(number) - 1
-        number = int(number)-1
-        recomendacion_info = last_recomendation_per_user[message.chat.id][number]
-        recommendation_id = recomendacion_info['recommendation']['id']
-        bot.reply_to(message,
-                     f"You chose {user_choice}. Thanks for your choice. When you're at the location, please type the /measurement command and follow the instructions.")
-        peticion = api_url + \
-            f"/members/{message.chat.id}/recommendations/{recommendation_id}"
-        info = "ACCEPTED"
-        try:
-            # Se registramos la recomendacion acceptada por el usuario.
-            response = requests.patch(peticion, headers=headers, json=info)
-            if response.status_code == 200:
-                data = response.json()
-            else:
-                print(
-                    f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
-                bot.reply_to("Please ask for a new recommendation.")
-        except Exception as e:
-            print("Error durante la solicitud:", e)
-            bot.reply_to("Error in the system. Please contact with @Maite314")
+        if number is not 1 or number is not 2 or number is not 3:
+            bot.reply_to(
+                message, "Please choose a valid option from the menu. For example: 'Option 1', 'Option 2', or 'Option 3'. Or send a text with this information.")
+        else:
+            recomendation_aceptada[message.chat.id] = int(number) - 1
+            number = int(number)-1
+            # Registramos la recomendacion aceptada que tiene el usuario. 
+            recomendacion_info = last_recomendation_per_user[message.chat.id][number]
+            recommendation_id = recomendacion_info['recommendation']['id']
+            peticion = api_url + \
+                f"/members/{message.chat.id}/recommendations/{recommendation_id}"
+            info = "ACCEPTED"
+            try:
+                # Se registramos la recomendacion acceptada por el usuario.
+                response = requests.patch(peticion, headers=headers, json=info)
+                if response.status_code == 200:
+                    data = response.json()
+                    bot.reply_to(message,
+                        f"You chose {user_choice}. Thanks for your choice. When you're at the location, please type the /measurement command and follow the instructions. then we will ask your location again and a picture in this place.")
+                    #Eliminamos la  ultima poscion del usuario! Porque aqui tiene que volver a enviarnosla cuando llegue al lugar. 
+                    db = Depends(deps.get_db)
+                    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+                    crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+                else:
+                    print(
+                        f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
+                    bot.reply_to("Please ask for a new recommendation.")
+            except Exception as e:
+                print("Error durante la solicitud:", e)
+                bot.reply_to("Error in the system. Please contact with @Maite314")
 
     else:
         bot.reply_to(
-            message, f"There are no recommendations for you at this time. We're sorry. Please request a recommendation.")
+            message, f"First please go the There are no recommendations for you at this time. We're sorry. Please request a recommendation.")
 
 
 @bot.message_handler(content_types=['photo'])
@@ -779,7 +763,7 @@ def handle_photo_and_location(message):
         # El usuario tiene recomendaciones aceptadas!
         if rec is None:
             bot.send_message(
-                message.chat.id, "We don't have your location. Please request a recommendation using the /recomendation command.")
+                message.chat.id, "We don't have your location. Please request a recommendation using the /recomendation command to be able to record your location first.")
         else:
             # Aquí puedes acceder a la información de la foto
             peticion = api_url + f"/members/{message.chat.id}/measurements"
@@ -810,7 +794,7 @@ def handle_photo_and_location(message):
                     downloaded_file = bot.download_file(file_info.file_path)
 
                     # Guarda la foto en el sistema de archivos
-                    file_path = f'src/Servicio/Telegram_bot/Pictures/photo{data["id"]}.jpg'
+                    file_path = f'Pictures/photo{data["id"]}.jpg'
                     with open(file_path, 'wb') as new_file:
                         new_file.write(downloaded_file)
                     peticion = api_url + \
@@ -838,7 +822,7 @@ def handle_photo_and_location(message):
                         data = response.json()
                         data_csv = [data["Latitude"],
                                     data['Longitude'], file_path]
-                        with open("src/Servicio/Telegram_bot/Pictures/CSVFILE.csv", "a", newline="") as f_object:
+                        with open("/Pictures/CSVFILE.csv", "a", newline="") as f_object:
                             # Pass the CSV  file object to the writer() function
                             writer_object = writer(f_object)
                             writer_object.writerow(data_csv)
@@ -848,14 +832,13 @@ def handle_photo_and_location(message):
                             message, "Thanks for sending the photo!")
                         bot.send_message(
                             message, "Your photo has been registered, but please take the photo at the location where you agreed to do so. You can see the map with photos with the command /map.")
-
+                        #Todo no se si esto esta bien! 
                         number = recomendation_aceptada[message.chat.id]
-                        recomendacion_info = last_recomendation_per_user[message.chat.id][int(
-                            number)]
+                        recomendacion_info = last_recomendation_per_user[message.chat.id][int(number)]
                         lat = recomendacion_info['cell']['centre']['Latitude']
                         long = recomendacion_info['cell']['centre']['Longitude']
-                        bot.send_location(
-                            chat_id=message.chat.id, latitude=lat, longitude=long)
+                        bot.send_location(chat_id=message.chat.id, latitude=lat, longitude=long)
+                        crear_mapa(message)
 
                     else:
                         print(
@@ -877,17 +860,18 @@ def handle_photo_and_location(message):
                     downloaded_file = bot.download_file(file_info.file_path)
 
                     # Guarda la foto en el sistema de archivos
-                    file_path = f'src/Servicio/Telegram_bot/Pictures/photo{data["id"]}.jpg'
+                    file_path = f'Pictures/photo{data["id"]}.jpg'
                     with open(file_path, 'wb') as new_file:
                         new_file.write(downloaded_file)
 
                     data_csv = [lat, long, file_path]
-                    with open("src/Servicio/Telegram_bot/Pictures/CSVFILE.csv", "a", newline="") as f_object:
+                    with open("Pictures/CSVFILE.csv", "a", newline="") as f_object:
                         # Pass the CSV  file object to the writer() function
                         writer_object = writer(f_object)
                         writer_object.writerow(data_csv)
                         f_object.close()
                     bot.reply_to(message, "Thanks for sending the photo!")
+                    crear_mapa(message)
 
             elif response.status_code == 401:
                 bot.reply_to(
@@ -911,9 +895,8 @@ def actualizar_repositorio():
     subprocess.run(['git', 'commit', '-m', 'Actualizar HTML'])
     subprocess.run(['git', 'push'])
 
-@bot.message_handler(commands=['map'])
+
 def crear_mapa(message):
-    # Tengo que pedir el centro de la camapaña- surface
     peticion = api_url + f"/hives/1/campaigns/1/surfaces"
     try:
         # Se registramos la recomendacion acceptada por el usuario.
@@ -933,7 +916,7 @@ def crear_mapa(message):
                 # Se registramos la recomendacion acceptada por el usuario.
                 response = requests.get(peticion, headers=headers,params={'time': datetime.datetime.utcnow()})
                 if response.status_code == 200:
-                    df = pd.read_csv('src/Servicio/Telegram_bot/Pictures/CSVFILE.csv',
+                    df = pd.read_csv('Pictures/CSVFILE.csv',
                                      names=['latitud', 'longitud', 'url_imagen'])
                     # Obtener el número de combinaciones diferentes de las dos primeras columnas
                     grupos = df.groupby(['latitud', 'longitud'])[
@@ -1044,10 +1027,17 @@ def crear_mapa(message):
     except Exception as e:
         print("Error durante la solicitud:", e)
 
+
+@bot.message_handler(commands=['map'])
+def crear_mapa(message):
+    # Tengo que pedir el centro de la camapaña- surface
+    bot.reply_to( message, "The map is in this URL: https://mpuerta004.github.io/Telegram_bot/. if your photo is not in the web page, wait a few seconds and reload the page.")
+
 @bot.message_handler(commands=['info'])
 def info(message):
-    bot.reply_to(message, message_info_interaction)
-    bot.reply_to(message, message_change_personal_information)
+    bot.send_message(message.chat.id, message_info_interaction)
+    bot.send_message(message.chat.id, message_change_personal_information)
+    bot.send_message(message.chat.id, "The map is in this URL: https://mpuerta004.github.io/Telegram_bot/")
 
 
 if __name__ == "__main__":

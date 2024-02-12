@@ -1,5 +1,0 @@
-pip install telebot
-pip install folium 
-pip install requests
-pip install pandas 
-

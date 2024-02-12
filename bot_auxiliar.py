@@ -21,6 +21,83 @@ headers = {
     }
 
 
+
+def add_user(message):
+    peticion = api_url + '/sync/hives/1/members/'
+    payload = [
+                {
+                    "member": {
+                        "name": message.chat.first_name,
+                        "surname": "",
+                        "age": 0,
+                        "gender": "NOANSWER",
+                        "city": "",
+                        "mail": "",
+                        "birthday": "2024-01-11T16:09:59",
+                        "real_user": True,
+                        "id": message.chat.id
+                    },
+                    "role": "WorkerBee"
+                }
+            ]
+            # Put endpoint to integrate the information of the user in the datases
+    try:
+        response = requests.put(peticion, headers=headers,
+                                            json=payload)
+                # Verificar el código de respuesta
+                # We insert the user correctly in the database,
+        if response.status_code == 201:
+                    # La solicitud fue exitosa
+            data = response.json()  # Si la respuesta es JSON
+            return data 
+        else:
+            return None
+    except Exception as e:
+        print( f"Error with the API: {e}")
+        return None 
+def add_device():
+    peticion = api_url + "/devices"
+    info_device = {
+                    "description": "string",
+                    "brand": "string",
+                    "model": "string",
+                    "year": "string"
+                }
+                # Post a new device in the dataset.
+    try:
+        response = requests.post(
+                    peticion, headers=headers, json=info_device)
+                        # IF the device is correctly inserted in the dataset.
+        if response.status_code == 201:
+                        data = response.json()  # Si la respuesta es JSON
+                        return data
+        else:
+            return None
+    except Exception as e:
+        print( f"Error with the API: {e}")
+        return None 
+
+def add_member_device(device_id:int, member_id:int):
+    info_device_member = {
+                            "member_id": member_id,
+                            "device_id": device_id,
+                        }
+    try:
+        peticion = api_url + f"/sync/hives/1/campaigns/1/devices"
+        response = requests.put(peticion, headers=headers, json=info_device_member)
+        # If we insert corretlly the user, the devide and the relation between them.
+        if response.status_code == 201:
+                            # La solicitud fue exitosa
+            data = response.json()  # Si la respuesta es JSON
+            return data
+        else:
+            return None
+    except Exception as e:
+        print( f"Error with the api: {e}")
+        return None 
+    
+    
+    
 def existe_user(id_user:int):
     #Si el usuario ya esta registrado o no! 
     peticion = api_url + f'/members/{id_user}'
@@ -55,11 +132,27 @@ def recomendaciones_aceptadas(id_user:int):
                         return i
             return None
         else:
-            print("Error with mysql")
+            print("Error with the API")
             return None
     except Exception as e:
         print( f"Error with mysql {e}" )    
         return None
+
+def recomendacion(id_user:int,recomendation_id:int):
+    #Aqui hay que ver si recomendaciones aceptadas cerca de la posicion. 
+    peticion = api_url + f"/members/{id_user}/recommendations/{recomendation_id}"
+    try:
+        response = requests.get(peticion, headers=headers)
+        if response.status_code == 200:
+            data= response.json()
+            return data
+        else:
+            print("Error with the API")
+            return None
+    except Exception as e:
+        print( f"Error with mysql {e}" )    
+        return None
+
 
 def get_campaign_hive_1(id_user:int):
     peticion = api_url +"/hives/1/campaigns"
@@ -93,11 +186,11 @@ def recomendacion(id_user:int, info,campaign_id:int):
         print( f"Error with mysql {e}" )
         return None
 
-def obtener_dimensiones_imagen(url_imagen):
-    # Obtener las dimensiones de la imagen utilizando PIL
-    with Image.open(url_imagen) as img:
-        ancho, alto = img.size
-    return ancho, alto
+# def obtener_dimensiones_imagen(url_imagen):
+#     # Obtener las dimensiones de la imagen utilizando PIL
+#     with Image.open(url_imagen) as img:
+#         ancho, alto = img.size
+#     return ancho, alto
             
 
 def get_point_at_distance(lat1, lon1, d, bearing, R=6371):
