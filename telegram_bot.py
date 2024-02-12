@@ -1024,7 +1024,7 @@ def crear_mapa(message):
                     mapa.save('map.html')
                     actualizar_repositorio()
                     bot.reply_to(
-                        message, "The map is inb this URL:")
+                        message, "The map is inb this URL: ")
                     # with open("map.html", "rb") as map_file:
                     #     bot.send_document(
                     #         message.chat.id, map_file, caption="Tu Mapa")
