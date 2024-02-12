@@ -907,7 +907,7 @@ def handle_photo_and_location(message):
 
 def actualizar_repositorio():
     # Ejecutar el comando para agregar, hacer commit y hacer push del archivo HTML
-    subprocess.run(['git', 'add', 'map.html'])
+    subprocess.run(['git', 'add', 'docs/map.html'])
     subprocess.run(['git', 'commit', '-m', 'Actualizar HTML'])
     subprocess.run(['git', 'push'])
 
@@ -1021,10 +1021,10 @@ def crear_mapa(message):
                             #         html=f'<div style="font-size: 20pt;">{str(Cardinal_actual)}</div>'
                             #     )).add_to(mapa)
 
-                    mapa.save('map.html')
+                    mapa.save('docs/map.html')
                     actualizar_repositorio()
                     bot.reply_to(
-                        message, "The map is inb this URL:")
+                        message, "The map is inb this URL: ")
                     # with open("map.html", "rb") as map_file:
                     #     bot.send_document(
                     #         message.chat.id, map_file, caption="Tu Mapa")
