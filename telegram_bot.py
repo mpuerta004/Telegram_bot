@@ -3,8 +3,6 @@ import json
 import requests
 import telebot
 from telebot import types
-from enum import Enum
-import random
 import datetime
 from csv import writer
 import folium
@@ -14,9 +12,10 @@ import csv
 from folium.features import DivIcon
 import bot_auxiliar
 import pandas as pd
-
 from folium import plugins
 from folium.utilities import image_to_url
+import subprocess
+
 
 # Ponemos nuestro Token generado con el @BotFather
 TOKEN = "6738738196:AAFVC0OT3RAv4PJvHsV4Vj9zYIlulIlnPLw"
@@ -27,16 +26,6 @@ bot = telebot.TeleBot(TOKEN)
 api_url = 'http://localhost:8001'
 last_recomendation_per_user = {}
 last_location_of_user = {}
-# message_change_personal_information = ("Te recuerdo que puedes modificar tus datos personales con los siguientes comandos:\n" +
-#                             "/setname [TU NOMBRE] -> para definir tu nombre, \n"
-#                             "/setsurname  [TU APELLIDO] -> para definir tu apellido, \n"+
-#                             "/setage [TU EDAD] -> Define tu edad, \n"+
-#                             "/setbirthday [YYYY-MM-DDT00:00:00] -> para definir tu cumpleaños, \n"+
-#                             "/setcity [TU CIUDAD] -> para definir tu ciudad, \n"+
-#                             "/setmail [TU EMAIL] -> para definir tu email, \n"+
-#                             "/setgender [NOBINARY or MALE or FEMALE or NOANSWER] -> para definir tu género. \n"+
-#                             "Esta información puede ser cambiada cuando quieras usando estos comandos.")
-
 message_change_personal_information = ("Also you can modify your personal information (if you want) using the following commands:\n" +
                                        "/setname [YOUR NAME] -> to set your name, \n"
                                        "/setsurname  [YOUR SURNAME] -> to set your surname, \n" +
@@ -44,7 +33,7 @@ message_change_personal_information = ("Also you can modify your personal inform
                                        "/setmail [YOUR EMAIL] -> to set your email, \n" +
                                        "/setgender [NOBINARY or MALE or FEMALE or NOANSWER] -> to set your gender. \n" +
                                        "This information can be changed anytime using these commands.")
-message_info_interaction = ("The goal of this system is to create a map of picture taken in diferentes places of Deusto. This system give you some recomendation of places to take photos and create a map of photos."+
+message_info_interaction = ("The goal of this system is to create a map of picture taken in diferentes places of Deusto. To create a map of the Deusto as pictures of Deusto. This system give you some recomendation of places to take photos and create a map of photos."+
                             "You can interact with me using the following commands:\n" +
                             "/recommendation -> to request places to take a photo, \n" +
                             "/measurements -> to send the photo in the place you accepted \n" +
@@ -73,105 +62,92 @@ def start(message):
     response = None
     try:
         response = requests.get(peticion, headers=headers)
-        # If the answer is 200 -> the user is already in the database!
-
-    except Exception as e:
-        print("Error durante la solicitud:", e)
-        return None
-
-    # CASE (user exists in the database).
-    if response.status_code == 200:
-        data = response.json()  # data -> user information -> Member
-        # bot.send_message(message.chat.id, f"Hola {message.chat.first_name}! Bienvenido de nuevo!")
-        bot.send_message(
-            message.chat.id, f"Hello {message.chat.first_name}! Welcome back!")
-        bot.send_message(message.chat.id, message_info_interaction)
-        bot.send_message(message.chat.id, message_change_personal_information)
-    # CASE (user dont exists in the database).
-    else:
-        # TODO igual aqui se le pueden hacer algunas preguntas para que diga sus datos personales!
-        # We insert in the database.
-        peticion = api_url + '/sync/hives/1/members/'
-        payload = [
-            {
-                "member": {
-                    "name": message.chat.first_name,
-                    "surname": "",
-                    "age": 0,
-                    "gender": "NOANSWER",
-                    "city": "",
-                    "mail": "",
-                    "birthday": "2024-01-11T16:09:59",
-                    "real_user": True,
-                    "id": message.chat.id
-                },
-                "role": "WorkerBee"
-            }
-        ]
-        response = None
-        try:
+        # If the answer is 200 -> the user is already in the database
+        # CASE (user exists in the database).
+        if response.status_code == 200:
+            data = response.json()  # data -> user information -> Member
+            bot.send_message(
+                message.chat.id, f"Hello {message.chat.first_name}! Welcome back!")
+            bot.send_message(message.chat.id, message_info_interaction)
+            bot.send_message(message.chat.id, message_change_personal_information)
+        # CASE (user dont exists in the database).
+        else:
+            # TODO igual aqui se le pueden hacer algunas preguntas para que diga sus datos personales!
+            # We insert in the database.
+            peticion = api_url + '/sync/hives/1/members/'
+            payload = [
+                {
+                    "member": {
+                        "name": message.chat.first_name,
+                        "surname": "",
+                        "age": 0,
+                        "gender": "NOANSWER",
+                        "city": "",
+                        "mail": "",
+                        "birthday": "2024-01-11T16:09:59",
+                        "real_user": True,
+                        "id": message.chat.id
+                    },
+                    "role": "WorkerBee"
+                }
+            ]
             # Put endpoint to integrate the information of the user in the datases
             response = requests.put(peticion, headers=headers,
-                                    json=payload)
-        except Exception as e:
-            print("Error durante la conexion con la base de datos:", e)
-            return None
+                                        json=payload)
             # Verificar el código de respuesta
-        # We insert the user correctly in the database,
-        if response.status_code == 201:
-            # La solicitud fue exitosa
-            data = response.json()  # Si la respuesta es JSON
-            # We have to insert a device in the dataset for the user and also relate the user with the device.
-            peticion = api_url + "/devices"
-            info_device = {
-                "description": "string",
-                "brand": "string",
-                "model": "string",
-                "year": "string"
-            }
-            response = None
-
-            try:
+            # We insert the user correctly in the database,
+            if response.status_code == 201:
+                # La solicitud fue exitosa
+                data = response.json()  # Si la respuesta es JSON
+                # We have to insert a device in the dataset for the user and also relate the user with the device.
+                peticion = api_url + "/devices"
+                info_device = {
+                    "description": "string",
+                    "brand": "string",
+                    "model": "string",
+                    "year": "string"
+                }
                 # Post a new device in the dataset.
                 response = requests.post(
-                    peticion, headers=headers, json=info_device)
-            except Exception as e:
+                peticion, headers=headers, json=info_device)
+                    # IF the device is correctly inserted in the dataset.
+                if response.status_code == 201:
+                    data = response.json()  # Si la respuesta es JSON
+                    # We insert in the database the Member_Device entity.
+                    info_device_member = {
+                            "member_id": message.chat.id,
+                            "device_id": data['id'],
+                        }
+                    # TODO igual el 1 de campaign no funciona
+                    peticion = api_url + f"/sync/hives/1/campaigns/1/devices"
+                    response = None
+                    response = requests.put(
+                                peticion, headers=headers, json=info_device_member)
+                    
+                    # If we insert corretlly the user, the devide and the relation between them.
+                    if response.status_code == 201:
+                        # La solicitud fue exitosa
+                        data = response.json()  # Si la respuesta es JSON
+                        bot.send_message(
+                                message.chat.id, f"Hello! Nice to meet you {message.chat.first_name}!")
+                        bot.send_message(message.chat.id, message_info_interaction)
+                        bot.send_message(
+                                message.chat.id, message_change_personal_information)
+                    else:
+                        print(
+                                f"Error en la solicitud. Código de respuesta: {response.status_code}")       
+                else:
+                        print(
+                                f"Error en la solicitud. Código de respuesta: {response.status_code}")       
+            else:
+                        print(
+                                f"Error en la solicitud. Código de respuesta: {response.status_code}")            
+                        
+    except Exception as e:
                 print("Error durante la conexion con la base de datos:", e)
                 return None
-            # IF the device is correctly inserted in the dataset.
-            if response.status_code == 201:
-                data = response.json()  # Si la respuesta es JSON
-                # We insert in the database the Member_Device entity.
-                info_device_member = {
-                    "member_id": message.chat.id,
-                    "device_id": data['id'],
-                }
-                # TODO igual el 1 de campaign no funciona
-                peticion = api_url + f"/sync/hives/1/campaigns/1/devices"
-                response = None
-                try:
-                    response = requests.put(
-                        peticion, headers=headers, json=info_device_member)
-                except Exception as e:
-                    print("Error durante la conexion con la base de datos:", e)
-                    return None
-                # If we insert corretlly the user, the devide and the relation between them.
-                if response.status_code == 201:
-                    # La solicitud fue exitosa
-                    data = response.json()  # Si la respuesta es JSON
-                    bot.send_message(
-                        message.chat.id, f"Hello! Nice to meet you {message.chat.first_name}!")
-                    bot.send_message(
-                        message.chat.id, message_change_personal_information)
-                else:
-                    print(
-                        f"Error en la solicitud. Código de respuesta: {response.status_code}")
-            else:
-                print(
-                    f"Error en la solicitud. Código de respuesta: {response.status_code}")
-        else:
-            print(
-                f"Error en la solicitud. Código de respuesta: {response.status_code}")
+           
+       
 
 
 # command /setname.
@@ -666,14 +642,11 @@ def set_city(message):
 @bot.message_handler(commands=['recommendation', 'measurement'])
 def recibir_localizacion(message):
     markup = types.ReplyKeyboardMarkup(row_width=1)
-
     location_btn = types.KeyboardButton(
         "Compartir ubicación", request_location=True)
     markup.add(location_btn)
     bot.send_message(
         message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
-
-# Ofrecemos al usuario la posibilidad de compartir su ubicación.
 
 
 @bot.message_handler(content_types=['location'])
@@ -780,20 +753,18 @@ def handle_option(message):
         peticion = api_url + \
             f"/members/{message.chat.id}/recommendations/{recommendation_id}"
         info = "ACCEPTED"
-        response = None
         try:
             # Se registramos la recomendacion acceptada por el usuario.
             response = requests.patch(peticion, headers=headers, json=info)
             if response.status_code == 200:
-                # La solicitud fue exitosa
                 data = response.json()
-
             else:
                 print(
                     f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
-
+                bot.reply_to("Please ask for a new recommendation.")
         except Exception as e:
             print("Error durante la solicitud:", e)
+            bot.reply_to("Error in the system. Please contact with @Maite314")
 
     else:
         bot.reply_to(
@@ -876,7 +847,7 @@ def handle_photo_and_location(message):
                         bot.reply_to(
                             message, "Thanks for sending the photo!")
                         bot.send_message(
-                            message, "Your photo has been registered, but please take the photo at the location where you agreed to do so.")
+                            message, "Your photo has been registered, but please take the photo at the location where you agreed to do so. You can see the map with photos with the command /map.")
 
                         number = recomendation_aceptada[message.chat.id]
                         recomendacion_info = last_recomendation_per_user[message.chat.id][int(
@@ -934,6 +905,11 @@ def handle_photo_and_location(message):
                 print(
                     f"Error en la solicitud de medicion. Código de respuesta: {response.status_code}")
 
+def actualizar_repositorio():
+    # Ejecutar el comando para agregar, hacer commit y hacer push del archivo HTML
+    subprocess.run(['git', 'add', 'map.html'])
+    subprocess.run(['git', 'commit', '-m', 'Actualizar HTML'])
+    subprocess.run(['git', 'push'])
 
 @bot.message_handler(commands=['map'])
 def crear_mapa(message):
@@ -949,11 +925,8 @@ def crear_mapa(message):
             surface_centre_lat = data['results'][0]['boundary']['centre']['Latitude']
             surface_centre_long = data['results'][0]['boundary']['centre']['Longitude']
             surface_radius = data['results'][0]['boundary']['radius']
-            # peticion= api_url +f"/members/{message.chat.id}/measurements"
-
             mapa = folium.Map(
                 location=[surface_centre_lat, surface_centre_long], zoom_start=18)
-            print(surface_centre_lat, surface_centre_long)
             peticion = api_url + f"/hives/1/campaigns/show"
             try:
 
@@ -976,7 +949,6 @@ def crear_mapa(message):
                         
                         
                         for i in range(0, n_files):
-                            tamano_imagen = min(95 * 2 ** (18 - 10), 150)
                             lat, long = combinacion[0], combinacion[1]
                             if 0 <= i*grados and 90 > i*grados:
                                 esquina_derecha_arriba=bot_auxiliar.get_point_at_distance(lat1=lat, lon1=long, d=radio,bearing=0 )
@@ -991,11 +963,6 @@ def crear_mapa(message):
                                     )
                                 image_overlay.add_to(mapa)
 
-                                print("de 0 a 90 grados")
-                                
-                                # folium.Marker(location=[lat, long], icon=folium.CustomIcon(
-                                # icon_image=datos_tercera_columna[i], icon_size=(95, 95), icon_anchor=(100, 100))).add_to(mapa)
-
                             elif 90 <= i*grados and 180 > i*grados:
                                 esquina_arriba_izquierda=bot_auxiliar.get_point_at_distance(lat1=lat, lon1=long, d=hipotenusa,bearing=135 )
                                 medio_ARRIBA=  [lat,long]
@@ -1007,12 +974,7 @@ def crear_mapa(message):
                                         cross_origin=False,
                                         zindex=1,
                                     )
-                                image_overlay.add_to(mapa)
-
-                                print("de 90 a 180")
-                                # folium.Marker(location=[lat, long], icon=folium.CustomIcon(
-                                #     icon_image=datos_tercera_columna[i], icon_size=(95, 95), icon_anchor=(100, 0))).add_to(mapa)
-
+                                image_overlay.add_to(mapa)                               
                             elif 180 <= i*grados and 270 > i*grados:
                                 lateral_izq_medio=bot_auxiliar.get_point_at_distance(lat1=lat, lon1=long, d=radio,bearing=180 )
                                 punto_central= bot_auxiliar.get_point_at_distance(lat1=lat, lon1=long, d=radio,bearing=270)
@@ -1025,10 +987,6 @@ def crear_mapa(message):
                                         zindex=1,
                                     )
                                 image_overlay.add_to(mapa)
-                                # print("de 180 a 270")
-                                # folium.Marker(location=[lat, long], icon=folium.CustomIcon(
-                                #     icon_image=datos_tercera_columna[i], icon_size=(95, 95), icon_anchor=(0, 0))).add_to(mapa)
-
                             else:
                                 lateral_derecho_medio=bot_auxiliar.get_point_at_distance(lat1=lat, lon1=long, d=hipotenusa,bearing=315 )
                                 central_point= [lat,long]
@@ -1041,35 +999,35 @@ def crear_mapa(message):
                                         zindex=1,
                                     )
                                 image_overlay.add_to(mapa)
-                                print("de 270 a 360")
                                 # folium.Marker(location=[lat, long], icon=folium.CustomIcon(
                                 #     icon_image=datos_tercera_columna[i], icon_size=(95, 95), icon_anchor=(0, 100))).add_to(mapa)
 
-                            df = pd.read_csv('src/Servicio/Telegram_bot/Pictures/DATAMAP.csv', names=[
-                                             "list_point", "id_user", "Cardinal_actual", "expected_measurements", "color_number"])
-                            for index, row in df.iterrows():
-                                list_point = json.loads(row["list_point"])
-                                id_user = row["id_user"]
-                                Cardinal_actual = row["Cardinal_actual"]
-                                excepted_measurements = row["expected_measurements"]
-                                # color_number=str(row[4])
+                            # df = pd.read_csv('src/Servicio/Telegram_bot/Pictures/DATAMAP.csv', names=[
+                            #                  "list_point", "id_user", "Cardinal_actual", "expected_measurements", "color_number"])
+                            # for index, row in df.iterrows():
+                            #     list_point = json.loads(row["list_point"])
+                            #     id_user = row["id_user"]
+                            #     Cardinal_actual = row["Cardinal_actual"]
+                            #     excepted_measurements = row["expected_measurements"]
+                            #     # color_number=str(row[4])
 
-                                folium.Polygon(locations=list_point, color='black', fill=False,
-                                               weight=1, popup=(folium.Popup(str(id_user))), opacity=0.25, fill_opacity=0.2).add_to(mapa)
+                            #     folium.Polygon(locations=list_point, color='black', fill=False,
+                            #                    weight=1, popup=(folium.Popup(str(id_user))), opacity=0.25, fill_opacity=0.2).add_to(mapa)
 
-                                folium.Marker(list_point[3], popup=f"Number of Expected measurements: {str(excepted_measurements)}",
-                                              icon=DivIcon(
-                                    icon_size=(200, 36),
-                                    icon_anchor=(0, 0),
-                                    html=f'<div style="font-size: 20pt;">{str(Cardinal_actual)}</div>'
-                                )).add_to(mapa)
+                            #     folium.Marker(list_point[3], popup=f"Number of Expected measurements: {str(excepted_measurements)}",
+                            #                   icon=DivIcon(
+                            #         icon_size=(200, 36),
+                            #         icon_anchor=(0, 0),
+                            #         html=f'<div style="font-size: 20pt;">{str(Cardinal_actual)}</div>'
+                            #     )).add_to(mapa)
 
                     mapa.save('map.html')
+                    actualizar_repositorio()
                     bot.reply_to(
-                        message, "This is the map with the result of the photos.")
-                    with open("map.html", "rb") as map_file:
-                        bot.send_document(
-                            message.chat.id, map_file, caption="Tu Mapa")
+                        message, "The map is inb this URL:")
+                    # with open("map.html", "rb") as map_file:
+                    #     bot.send_document(
+                    #         message.chat.id, map_file, caption="Tu Mapa")
                 else:
                     print(
                         f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
