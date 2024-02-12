@@ -38,9 +38,9 @@ services:
     restart: always
     tty: true
     volumes:
-    - ./:/telegram_bot
-    # ports:
-    #   - 8002:8002
+    - ./:/Telegram_bot
+    ports:
+      - 8002:8002
     environment:
       - APP_SECRET_STRING=archmage
       - DATABASE_USERNAME=telegram_bot

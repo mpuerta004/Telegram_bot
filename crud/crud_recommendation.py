@@ -23,7 +23,7 @@ class CRUDRecommendation(CRUDBase[Recommendation, RecommendationCreate, Recommen
         def create_recommendation(self, db: Session, *, obj_in: RecommendationCreate, member_id:int,state:str, posicion:int,id:int) -> Recommendation:
                 try:
                         obj_in_data = jsonable_encoder(obj_in) 
-                        db_obj = self.model(**obj_in_data,member_id=member_id,state=state,posicion:int,id:int)  # type: ignore
+                        db_obj = self.model(**obj_in_data,member_id=member_id,state=state,posicion=position,id=id)  # type: ignore
                         db.add(db_obj)
                         db.commit()
                         db.refresh(db_obj)

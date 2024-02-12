@@ -22,7 +22,7 @@ from fastapi import (APIRouter, Depends,
 
 import deps
 
-SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql:3307/Telegram_bot_db"
+SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql_bot:3307/Telegram_bot_db"
 sessionmaker = FastAPISessionMaker(SQLALCHEMY_DATABASE_URL)
 import crud
 from schemas.Member import MemberCreate, MemberUpdate, MemberSearchResults
@@ -85,13 +85,13 @@ def start(message):
         # CASE (user dont exists in the database).
         else:
             data=bot_auxiliar.add_user(message=message)
-            if data is not None:
+            if data != None:
                 # We have to insert a device in the dataset for the user and also relate the user with the device.
                 data=bot_auxiliar.add_device()
-                if data is not None:
+                if data != None:
                     data=bot_auxiliar.add_member_device(member_id=message.chat.id, device_id=data['id'])
                     # We insert in the database the Member_Device entity.
-                    if data is not None:
+                    if data != None:
                         bot.send_message(
                                 message.chat.id, f"Hello! Nice to meet you {message.chat.first_name}!")
                         bot.send_message(message.chat.id, message_goal_of_the_system)
@@ -719,7 +719,7 @@ def handle_option(message):
     if last_recomendation_per_user[message.chat.id] is not None:
         # Asegurate que sigue activa la recomendacion es decir si tiene aceptadas y no las ha realizado hay que corregiirlo.
         number = message.text.replace('Option ', '').strip()
-        if number is not 1 or number is not 2 or number is not 3:
+        if int(number) != 1 and int(number)!= 2 and int(number) != 3:
             bot.reply_to(
                 message, "Please choose a valid option from the menu. For example: 'Option 1', 'Option 2', or 'Option 3'. Or send a text with this information.")
         else:

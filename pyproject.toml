@@ -12,6 +12,8 @@ folium = "^0.15.1"
 requests = "^2.31.0"
 pandas = "^2.2.0"
 fastapi-utils = "^0.2.1"
+mysql-connector = "^2.2.9"
+mysql = "^0.0.3"
 
 
 [build-system]

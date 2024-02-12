@@ -2,10 +2,10 @@ FROM python:3.11.4
 
 WORKDIR /
 
-# COPY poetry.lock pyproject.toml ./
-# RUN pip install poetry && \
-#     poetry config virtualenvs.create false && \
-#     poetry install --no-dev  
+COPY poetry.lock pyproject.toml ./
+RUN pip install poetry && \
+     poetry config virtualenvs.create false && \
+     poetry install --no-dev  
 
 ADD . /telegram_bot
 
