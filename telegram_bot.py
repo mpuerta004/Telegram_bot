@@ -7,7 +7,7 @@ import datetime
 from csv import writer
 import folium
 from folium import plugins
-from IPython.display import display
+# from IPython.display import display
 import csv
 from folium.features import DivIcon
 import bot_auxiliar
@@ -22,7 +22,7 @@ from fastapi import (APIRouter, Depends,
 
 import deps
 
-SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql_bot:3307/Telegram_bot_db"
+SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql_bot:3306/Telegram_bot_db"
 sessionmaker = FastAPISessionMaker(SQLALCHEMY_DATABASE_URL)
 import crud
 from schemas.Member import MemberCreate, MemberUpdate, MemberSearchResults
@@ -34,7 +34,7 @@ from schemas.last_user_position import Last_user_positionCreate, Last_user_posit
 TOKEN = "6738738196:AAFVC0OT3RAv4PJvHsV4Vj9zYIlulIlnPLw"
 # Creamos nuestra instancia "bot" a partir de ese TOKEN
 bot = telebot.TeleBot(TOKEN)
-api_url = 'http://localhost:8001'
+api_url = 'http://recommendersystem:8001'
 
 #Variables para recordar ele stado de las cosas!
 last_recomendation_per_user = {}
@@ -109,7 +109,9 @@ def start(message):
                 
     except Exception as e:
         print("Error durante la conexion con la base de datos:", e)
+        bot.send_message(message.chat.id,"Error with the system")
         return None
+    
            
 
 # command /setname.

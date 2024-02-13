@@ -7,7 +7,7 @@ import datetime
 from csv import writer
 import folium
 from folium import plugins
-from IPython.display import display
+# from IPython.display import display
 import csv
 import math
 from math import asin, atan2, cos, degrees, radians, sin, sqrt
