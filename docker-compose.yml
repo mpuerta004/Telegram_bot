@@ -22,7 +22,7 @@ services:
       MYSQL_DATABASE: Telegram_bot_db
       MYSQL_ROOT_PASSWORD: mypasswd
     ports:
-      - "3307:3307"
+      - "3306:3307"
     
     # networks:
     #   - academe-platform_sociobee_network
@@ -38,9 +38,9 @@ services:
     restart: always
     tty: true
     volumes:
-    - ./:/Telegram_bot
+    - ./:/telegram_bot
     ports:
-      - 8002:8002
+      - 8001:8002
     environment:
       - APP_SECRET_STRING=archmage
       - DATABASE_USERNAME=telegram_bot
