@@ -15,7 +15,7 @@ from sqlalchemy import Integer, Enum, BigInteger
 
 
 class Last_user_position(Base):
-    __tablename__='last_user_position'
+    __tablename__='Last_user_position'
     member_id=Column(BigInteger, ForeignKey(Member.id, ondelete="CASCADE"),primary_key=True)
     location=Column(Point)
     

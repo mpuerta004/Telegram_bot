@@ -6,6 +6,7 @@ from telebot import types
 import datetime
 from csv import writer
 import folium
+# from fastapi import FastAPI, APIRouter, Query, HTTPException, Request, Depends
 from folium import plugins
 # from IPython.display import display
 import csv
@@ -16,32 +17,43 @@ from folium import plugins
 from folium.utilities import image_to_url
 import subprocess
 from fastapi_utils.session import FastAPISessionMaker
-from fastapi import (APIRouter, Depends,
-                     HTTPException, Query)
-
-
+# from fastapi import (APIRouter, Depends, HTTPException, Query)
 import deps
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql_bot:3306/Telegram_bot_db"
-sessionmaker = FastAPISessionMaker(SQLALCHEMY_DATABASE_URL)
+# SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql_bot:3306/Telegram_bot_db"
+# engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# Session = sessionmaker(bind=engine)
+# session = Session()
+
+# Crear la conexión a la base de datos
+def create_db_engine():
+    return create_engine('mysql+mysqlconnector://root:mypasswd@mysql_bot:3306/Telegram_bot_db')
+
+# Crear la sesión de base de datos
+def create_db_session(engine):
+    Session = sessionmaker(bind=engine)
+    return Session()
+
 import crud
+from sqlalchemy.orm import Session
 from schemas.Member import MemberCreate, MemberUpdate, MemberSearchResults
 from schemas.Recommendation import RecommendationCreate, RecommendationUpdate, RecommendationSearchResults
 from schemas.last_user_position import Last_user_positionCreate, Last_user_positionUpdate, Last_user_positionSearchResults
-
 
 # Ponemos nuestro Token generado con el @BotFather
 TOKEN = "6738738196:AAFVC0OT3RAv4PJvHsV4Vj9zYIlulIlnPLw"
 # Creamos nuestra instancia "bot" a partir de ese TOKEN
 bot = telebot.TeleBot(TOKEN)
-api_url = 'http://recommendersystem:8001'
+api_url = 'http://mve:8001'
 
-#Variables para recordar ele stado de las cosas!
+# Variables para recordar el estado de las cosas!!
 last_recomendation_per_user = {}
 last_location_of_user = {}
 recomendation_aceptada = {}
 
-#MEnsajes determinados 
+# Mensajes determinados 
 message_goal_of_the_system={"The goal of this system is create a collage of our neighborhood.This system will ask you to go to different places in the neighborhood and take pictures that catch your attention in that place."}
 message_change_personal_information = ("Also you can modify your personal information (if you want) using the following commands:\n" +
                                        "/setname [YOUR NAME] -> to set your name, \n"
@@ -75,13 +87,15 @@ def start(message):
         # CASE (user exists in the database).
         if response.status_code == 200:
             data = response.json()  # data -> user information -> Member
-            db= Depends(deps.get_db)
-            Member= MemberCreate(id=message.chat.id, name=message.chat.first_name,surname="",age=0, gender="NOANSWER", city="", mail=message.chat.username, birthday=datetime.datetime.now())
-            crud.member.create_member(db=db, member=Member)
+            # engine = create_db_engine()
+            # db = create_db_session(engine)
+            # Member= MemberCreate(id=message.chat.id, name=str(message.chat.first_name),surname="",age=0, gender="NOANSWER", city="", mail=message.chat.username, birthday=datetime.datetime.now())
+            # crud.member.create_member(db=db, obj_in=Member)
             bot.send_message(message.chat.id, f"Hello {message.chat.first_name}! Welcome back!")
             bot.send_message(message.chat.id, message_goal_of_the_system)
             bot.send_message(message.chat.id, message_info_interaction)
             bot.send_message(message.chat.id, message_change_personal_information)
+            # db.close()
         # CASE (user dont exists in the database).
         else:
             data=bot_auxiliar.add_user(message=message)
@@ -97,6 +111,11 @@ def start(message):
                         bot.send_message(message.chat.id, message_goal_of_the_system)
                         bot.send_message(message.chat.id, message_info_interaction)
                         bot.send_message(message.chat.id, message_change_personal_information)
+                        engine = create_db_engine()
+                        db = create_db_session(engine)
+                        Member= MemberCreate(id=message.chat.id, name=message.chat.first_name,surname="",age=0, gender="NOANSWER", city="", mail=message.chat.username, birthday=datetime.datetime.now())
+                        crud.member.create_member(db=db, member=Member)
+                        db.close()
                     else:
                         print(
                                 f"Error en la solicitud. Código de respuesta: {response.status_code}")       
@@ -609,29 +628,32 @@ def recibir_localizacion(message):
     location_btn = types.KeyboardButton(
         "Share location", request_location=True)
     markup.add(location_btn)
-    bot.send_message(
-        message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
-    db = Depends(deps.get_db)
+    bot.send_message(message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
+    engine = create_db_engine()
+    db = create_db_session(engine)
     last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-    crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
-
+    db.commit()
+    if last_user_position != None:
+        crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+        db.commit()
+    db.close()
     
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
     user = bot_auxiliar.existe_user(message.chat.id)
     if user is not None:
-        db = Depends(deps.get_db)
-        
-        last_location_of_user= Last_user_positionCreate(id=message.chat.id, location={
+        engine = create_db_engine()
+        db = create_db_session(engine)        
+        last_location_of_user= Last_user_positionCreate(member_id=message.chat.id, location={
                 'Longitude': message.location.longitude, 'Latitude': message.location.latitude})
-        crud.last_user_position.create_last_user_position(db=db, last_user_position=last_location_of_user)
-        
+        crud.last_user_position.create_last_user_position(db=db, obj_in=last_location_of_user)
+        db.close()
+
         info = {
             "member_current_location": {
                 "Longitude": message.location.longitude,
                 "Latitude": message.location.latitude
             }}
-        last_location_of_user[message.chat.id] = info
         rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
         # El usuario tiene recomendaciones aceptadas!
         if rec is not None:
@@ -642,13 +664,18 @@ def handle_location(message):
             campaign = bot_auxiliar.get_campaign_hive_1(message.chat.id)
             if campaign is not None:
                 campaign_id = campaign['id']
-
+                # engine = create_db_engine()
+                # db = create_db_session(engine)  
                 data = bot_auxiliar.recomendacion(
                     id_user=message.chat.id, campaign_id=campaign_id, info=info)
                 if data is not None and data!={"detail": "Incorrect_user_campaign"} and data != {'detail': 'far_away'} and data != {'details': 'Incorrect_user_role'} and data != {"detail": "no_measurements_needed"}:
                     # Eliminamos los datos anteriores guardados
-                    recomendation_aceptada[message.chat.id] = 0
-                    last_recomendation_per_user[message.chat.id] = data['results']
+                    engine = create_db_engine()
+                    db = create_db_session(engine)  
+                    for i in data['results']:
+                        recomendation= RecommendationCreate(id=i['recommendation']['id'], posicion=int(i)+1, state="NOTIFIED")
+                        crud.recommendation.create_recommendation(db=db, obj_in=recomendation)
+                    db.close()
                     # TODO! ExTEPCIONES
                     if len(data['results']) == 0:
                         bot.send_message(
@@ -700,9 +727,13 @@ def handle_location(message):
                                           'centre']['Latitude'], longitude=data['results'][2]['cell']['centre']['Longitude'])
                         bot.send_message(
                             message.chat.id, "Please choose from the menu where you want to take the photo.", reply_markup=markup)
-                    db = Depends(deps.get_db)
+                    engine = create_db_engine()
+                    db = create_db_session(engine)                    
                     last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-                    crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+                    if last_user_position !=None:
+                        crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+                    db.close()
+                
                 else:
                     bot.reply_to(
                         message, "There are no possible recommendations for you at this time. We're sorry.")
@@ -725,10 +756,7 @@ def handle_option(message):
             bot.reply_to(
                 message, "Please choose a valid option from the menu. For example: 'Option 1', 'Option 2', or 'Option 3'. Or send a text with this information.")
         else:
-            recomendation_aceptada[message.chat.id] = int(number) - 1
-            number = int(number)-1
             # Registramos la recomendacion aceptada que tiene el usuario. 
-            recomendacion_info = last_recomendation_per_user[message.chat.id][number]
             recommendation_id = recomendacion_info['recommendation']['id']
             peticion = api_url + \
                 f"/members/{message.chat.id}/recommendations/{recommendation_id}"
@@ -741,16 +769,21 @@ def handle_option(message):
                     bot.reply_to(message,
                         f"You chose {user_choice}. Thanks for your choice. When you're at the location, please type the /measurement command and follow the instructions. then we will ask your location again and a picture in this place.")
                     #Eliminamos la  ultima poscion del usuario! Porque aqui tiene que volver a enviarnosla cuando llegue al lugar. 
-                    db = Depends(deps.get_db)
+                    engine = create_db_engine()
+                    db = create_db_session(engine)
                     last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-                    crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+                    if last_user_position != None :
+                        crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+                    recomendacion_aceepted=crud.recommendation.get_recommendation_for_position(db=db, member_id=message.chat.id, position=number)
+                    crud.recommendation.update(db=db, db_obj=recomendacion_aceepted, obj_in={"state":"ACCEPTED"})
+                    db.close()
                 else:
                     print(
                         f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
-                    bot.reply_to("Please ask for a new recommendation.")
+                    bot.reply_to(message.chat.id,"Please ask for a new recommendation.")
             except Exception as e:
                 print("Error durante la solicitud:", e)
-                bot.reply_to("Error in the system. Please contact with @Maite314")
+                bot.reply_to(message.chat.id, "Error in the system. Please contact with @Maite314")
 
     else:
         bot.reply_to(
@@ -760,136 +793,145 @@ def handle_option(message):
 @bot.message_handler(content_types=['photo'])
 def handle_photo_and_location(message):
     # Verificar si el mensaje contiene una foto
-    if message.photo:
-        rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
-        # El usuario tiene recomendaciones aceptadas!
-        if rec is None:
-            bot.send_message(
-                message.chat.id, "We don't have your location. Please request a recommendation using the /recomendation command to be able to record your location first.")
-        else:
-            # Aquí puedes acceder a la información de la foto
-            peticion = api_url + f"/members/{message.chat.id}/measurements"
-            posicion_user = last_location_of_user[message.chat.id]
-            date = datetime.datetime.utcnow()
-            measurement_creation = {
-                "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
-                "location": {
-                    "Longitude": posicion_user["member_current_location"]["Longitude"],
-                    "Latitude": posicion_user["member_current_location"]["Latitude"]
-                },
-                "no2": 0,
-                "co2": 0,
-                "o3": 0,
-                "so02": 0,
-                "pm10": 0,
-                "pm25": 0,
-                "pm1": 0,
-                "benzene": 0}
-            response = requests.post(
-                peticion, headers=headers, json=measurement_creation)
-            if response.status_code == 201:
-                data = response.json()
-                if data['recommendation_id'] == None:
-                    file_id = message.photo[-1].file_id
-                    file_info = bot.get_file(file_id)
-                    # Descarga la foto
-                    downloaded_file = bot.download_file(file_info.file_path)
+    engine = create_db_engine()
+    db = create_db_session(engine)
+    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+    db.close()
+    if last_user_position !=None:
+        
+        if message.photo:
+            rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
+            # El usuario tiene recomendaciones aceptadas!
+            if rec is None:
+                bot.send_message(
+                    message.chat.id, "We don't have your location. Please request a recommendation using the /recomendation command to be able to record your location first.")
+            else:
+                # Aquí puedes acceder a la información de la foto
+                peticion = api_url + f"/members/{message.chat.id}/measurements"
+                posicion_user = last_location_of_user
+                date = datetime.datetime.utcnow()
+                measurement_creation = {
+                    "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "location": {
+                        "Longitude": posicion_user["member_current_location"]["Longitude"],
+                        "Latitude": posicion_user["member_current_location"]["Latitude"]
+                    },
+                    "no2": 0,
+                    "co2": 0,
+                    "o3": 0,
+                    "so02": 0,
+                    "pm10": 0,
+                    "pm25": 0,
+                    "pm1": 0,
+                    "benzene": 0}
+                response = requests.post(
+                    peticion, headers=headers, json=measurement_creation)
+                if response.status_code == 201:
+                    data = response.json()
+                    if data['recommendation_id'] == None:
+                        file_id = message.photo[-1].file_id
+                        file_info = bot.get_file(file_id)
+                        # Descarga la foto
+                        downloaded_file = bot.download_file(file_info.file_path)
 
-                    # Guarda la foto en el sistema de archivos
-                    file_path = f'Pictures/photo{data["id"]}.jpg'
-                    with open(file_path, 'wb') as new_file:
-                        new_file.write(downloaded_file)
-                    peticion = api_url + \
-                        f"/sync/get_location/{message.chat.id}"
-                    posicion_user = last_location_of_user[message.chat.id]
-                    date = datetime.datetime.utcnow()
-                    measurement_creation = {
-                        "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
-                        "location": {
-                            "Longitude": posicion_user["member_current_location"]["Longitude"],
-                            "Latitude": posicion_user["member_current_location"]["Latitude"]
-                        },
-                        "no2": 0,
-                        "co2": 0,
-                        "o3": 0,
-                        "so02": 0,
-                        "pm10": 0,
-                        "pm25": 0,
-                        "pm1": 0,
-                        "benzene": 0}
+                        # Guarda la foto en el sistema de archivos
+                        file_path = f'Pictures/photo{data["id"]}.jpg'
+                        with open(file_path, 'wb') as new_file:
+                            new_file.write(downloaded_file)
+                        peticion = api_url + \
+                            f"/sync/get_location/{message.chat.id}"
+                        posicion_user = last_location_of_user[message.chat.id]
+                        date = datetime.datetime.utcnow()
+                        measurement_creation = {
+                            "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "location": {
+                                "Longitude": posicion_user["member_current_location"]["Longitude"],
+                                "Latitude": posicion_user["member_current_location"]["Latitude"]
+                            },
+                            "no2": 0,
+                            "co2": 0,
+                            "o3": 0,
+                            "so02": 0,
+                            "pm10": 0,
+                            "pm25": 0,
+                            "pm1": 0,
+                            "benzene": 0}
 
-                    response = requests.get(
-                        peticion, headers=headers, json=measurement_creation)
-                    if response.status_code == 200:
-                        data = response.json()
-                        data_csv = [data["Latitude"],
-                                    data['Longitude'], file_path]
-                        with open("/Pictures/CSVFILE.csv", "a", newline="") as f_object:
+                        response = requests.get(
+                            peticion, headers=headers, json=measurement_creation)
+                        if response.status_code == 200:
+                            data = response.json()
+                            data_csv = [data["Latitude"],
+                                        data['Longitude'], file_path]
+                            with open("/Pictures/CSVFILE.csv", "a", newline="") as f_object:
+                                # Pass the CSV  file object to the writer() function
+                                writer_object = writer(f_object)
+                                writer_object.writerow(data_csv)
+                                # Close the file object
+                                f_object.close()
+                            bot.reply_to(
+                                message, "Thanks for sending the photo!")
+                            bot.send_message(
+                                message, "Your photo has been registered, but please take the photo at the location where you agreed to do so. You can see the map with photos with the command /map.")
+                            #Todo no se si esto esta bien! 
+                            number = recomendation_aceptada[message.chat.id]
+                            recomendacion_info = last_recomendation_per_user[message.chat.id][int(number)]
+                            lat = recomendacion_info['cell']['centre']['Latitude']
+                            long = recomendacion_info['cell']['centre']['Longitude']
+                            bot.send_location(chat_id=message.chat.id, latitude=lat, longitude=long)
+                            crear_mapa(message)
+
+                        else:
+                            print(
+                                f"Error en la solicitud de medicion. Código de respuesta: {response.status_code}")
+
+                    else:
+                        engine = create_db_engine()
+                        db = create_db_session(engine)
+                        elements=crud.recommendation.get_All_Recommendation(db=db, member_id=message.chat.id)
+                        for i in elements['results']:
+                            crud.recommendation.remove(db=db, db_obj=i)
+                        crud.last_user_position.remove(db=db, Last_user_position=last_user_position)
+                        db.close()
+                        recomendacion_info = last_recomendation_per_user
+                        lat = recomendacion_info['cell']['centre']['Latitude']
+                        long = recomendacion_info['cell']['centre']['Longitude']
+                        file_id = message.photo[-1].file_id
+                        # Obtiene información sobre el archivo de la foto
+                        file_info = bot.get_file(file_id)
+
+                        # Descarga la foto
+                        downloaded_file = bot.download_file(file_info.file_path)
+
+                        # Guarda la foto en el sistema de archivos
+                        file_path = f'Pictures/photo{data["id"]}.jpg'
+                        with open(file_path, 'wb') as new_file:
+                            new_file.write(downloaded_file)
+
+                        data_csv = [lat, long, file_path]
+                        with open("Pictures/CSVFILE.csv", "a", newline="") as f_object:
                             # Pass the CSV  file object to the writer() function
                             writer_object = writer(f_object)
                             writer_object.writerow(data_csv)
-                            # Close the file object
                             f_object.close()
-                        bot.reply_to(
-                            message, "Thanks for sending the photo!")
-                        bot.send_message(
-                            message, "Your photo has been registered, but please take the photo at the location where you agreed to do so. You can see the map with photos with the command /map.")
-                        #Todo no se si esto esta bien! 
-                        number = recomendation_aceptada[message.chat.id]
-                        recomendacion_info = last_recomendation_per_user[message.chat.id][int(number)]
-                        lat = recomendacion_info['cell']['centre']['Latitude']
-                        long = recomendacion_info['cell']['centre']['Longitude']
-                        bot.send_location(chat_id=message.chat.id, latitude=lat, longitude=long)
+                        bot.reply_to(message, "Thanks for sending the photo!")
                         crear_mapa(message)
 
-                    else:
-                        print(
-                            f"Error en la solicitud de medicion. Código de respuesta: {response.status_code}")
-
-                else:
+                elif response.status_code == 401:
+                    bot.reply_to(
+                        message, "There is no active campaign or this position is not within the campaign. Please send a location at the point you agreed.")
+                    bot.reply_to(
+                        message, "Please take the photo at the location where you agreed to do so.")
                     number = recomendation_aceptada[message.chat.id]
                     recomendacion_info = last_recomendation_per_user[message.chat.id][int(
                         number)]
                     lat = recomendacion_info['cell']['centre']['Latitude']
                     long = recomendacion_info['cell']['centre']['Longitude']
-                    file_id = message.photo[-1].file_id
-                    recomendation_aceptada[message.chat.id] = 0
-                    del last_recomendation_per_user[message.chat.id]
-                    # Obtiene información sobre el archivo de la foto
-                    file_info = bot.get_file(file_id)
-
-                    # Descarga la foto
-                    downloaded_file = bot.download_file(file_info.file_path)
-
-                    # Guarda la foto en el sistema de archivos
-                    file_path = f'Pictures/photo{data["id"]}.jpg'
-                    with open(file_path, 'wb') as new_file:
-                        new_file.write(downloaded_file)
-
-                    data_csv = [lat, long, file_path]
-                    with open("Pictures/CSVFILE.csv", "a", newline="") as f_object:
-                        # Pass the CSV  file object to the writer() function
-                        writer_object = writer(f_object)
-                        writer_object.writerow(data_csv)
-                        f_object.close()
-                    bot.reply_to(message, "Thanks for sending the photo!")
-                    crear_mapa(message)
-
-            elif response.status_code == 401:
-                bot.reply_to(
-                    message, "There is no active campaign or this position is not within the campaign. Please send a location at the point you agreed.")
-                bot.reply_to(
-                    message, "Please take the photo at the location where you agreed to do so.")
-                number = recomendation_aceptada[message.chat.id]
-                recomendacion_info = last_recomendation_per_user[message.chat.id][int(
-                    number)]
-                lat = recomendacion_info['cell']['centre']['Latitude']
-                long = recomendacion_info['cell']['centre']['Longitude']
-                bot.send_location(chat_id=message.chat.id,
-                                  latitude=lat, longitude=long)
-            else:
-                print(
-                    f"Error en la solicitud de medicion. Código de respuesta: {response.status_code}")
+                    bot.send_location(chat_id=message.chat.id,
+                                    latitude=lat, longitude=long)
+                else:
+                    print(
+                        f"Error en la solicitud de medicion. Código de respuesta: {response.status_code}")
 
 def actualizar_repositorio():
     # Ejecutar el comando para agregar, hacer commit y hacer push del archivo HTML

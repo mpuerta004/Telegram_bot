@@ -34,8 +34,6 @@ CREATE TABLE Member (
   PRIMARY KEY (id)
   );
 
-
-
 CREATE TABLE Last_user_position(
   member_id BIGINT NOT NULL,
   location POINT NOT NULL,
@@ -61,3 +59,9 @@ CREATE TABLE Recommendation (
     REFERENCES Member (id)
     ON DELETE CASCADE
     );
+
+-- CREATE Table Measurement(
+--   url VARCHAR(100) not null,
+--   position POINT, 
+
+-- )

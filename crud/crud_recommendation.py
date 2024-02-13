@@ -52,6 +52,11 @@ class CRUDRecommendation(CRUDBase[Recommendation, RecommendationCreate, Recommen
                         return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id, Recommendation.state=="ACCEPTED")).first()
                 except Exception as e:
                         raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
+        def get_recommendation_all(self, db: Session, *, member_id:int) -> Recommendation:
+                try:
+                        return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id, Recommendation.state=="ACCEPTED")).first()
+                except Exception as e:
+                        raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
         def get_recommendation_for_position(self, db: Session, *, member_id:int,position:int) -> Recommendation:
                 try:
                         return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id,Recommendation.posicion==position)).first()

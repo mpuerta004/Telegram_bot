@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional, Union, List
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from crud.base import CRUDBase
 from models.last_user_position import Last_user_position
@@ -9,14 +10,16 @@ from schemas.last_user_position import Last_user_positionCreate, Last_user_posit
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import and_, extract
 from sqlalchemy import func
+from fastapi import HTTPException
+
 
 class CRUDLast_user_position(CRUDBase[Last_user_position, Last_user_positionCreate, Last_user_positionUpdate]):
     
-     def get_by_id(self, db: Session, *, member_id:int) -> Optional[Last_user_position]:
+     def get_by_id(self, db: Session,*,member_id:int) -> Last_user_position:
           try:
-              return db.query(Last_user_position).filter(and_(Last_user_position.member_id == member_id)).first()
+              return db.query(Last_user_position).filter(Last_user_position.member_id == member_id).first()
           except Exception as e:
-                        raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
+               raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
    
         
      def remove(self, db: Session, *, Last_user_position:Last_user_position) -> Last_user_position:
@@ -26,14 +29,14 @@ class CRUDLast_user_position(CRUDBase[Last_user_position, Last_user_positionCrea
                db.commit()
                return obj
           except Exception as e:
-                        raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
+               raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
    
         
    
-     def create_member(self, db: Session, *, obj_in: Last_user_positionCreate,id:int) -> Last_user_position:
+     def create_last_user_position(self, db: Session, *, obj_in: Last_user_positionCreate) -> Last_user_position:
               try:
                      obj_in_data = jsonable_encoder(obj_in) 
-                     db_obj = self.model(**obj_in_data,id=id)  # type: ignore
+                     db_obj = self.model(**obj_in_data)  # type: ignore
                      db.add(db_obj)
                      db.commit()
                      db.refresh(db_obj)
