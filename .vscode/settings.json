@@ -7,7 +7,7 @@
             },
             "previewLimit": 50,
             "server": "mysql_bot",
-            "port": 3307,
+            "port": 3306,
             "driver": "MySQL",
             "name": "try_2",
             "database": "Telegram_bot_db",

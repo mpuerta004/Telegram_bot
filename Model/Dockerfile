@@ -19,7 +19,7 @@ COPY init.sql /mysql/init.sql
 
 ADD init.sql /docker-entrypoint-initdb.d
 
-EXPOSE 3306
+EXPOSE 3307
 
 #RUN /mysql/setup.sh
 # ENTRYPOINT ["tail", "-f", "/dev/null"]
