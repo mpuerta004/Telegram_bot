@@ -46,6 +46,6 @@ services:
       - DATABASE_USERNAME=telegram_bot
       - DATABASE_PASSWORD=telegram_botpasswd123
       - DATABASE=Telegram_bot_db
-      - DATABASE_HOST=mysql
+      - DATABASE_HOST=mysql_bot
     # networks:
     #   - academe-platform_sociobee_network
