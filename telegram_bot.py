@@ -777,6 +777,10 @@ def handle_option(message):
                     recomendacion_aceepted=crud.recommendation.get_recommendation_for_position(db=db, member_id=message.chat.id, position=number)
                     crud.recommendation.update(db=db, db_obj=recomendacion_aceepted, obj_in={"state":"ACCEPTED"})
                     db.close()
+<<<<<<< HEAD
+=======
+                    
+>>>>>>> fd60404673489bb4caafcdc624b606bfea08760b
                 else:
                     print(
                         f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
