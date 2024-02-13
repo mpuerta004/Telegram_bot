@@ -30,10 +30,10 @@ class CRUDMember(CRUDBase[Member, MemberCreate, MemberUpdate]):
    
         
    
-     def create_member(self, db: Session, *, obj_in: MemberCreate,id:int) -> Member:
+     def create_member(self, db: Session, *, obj_in: MemberCreate) -> Member:
               try:
                      obj_in_data = jsonable_encoder(obj_in) 
-                     db_obj = self.model(**obj_in_data,id=id)  # type: ignore
+                     db_obj = self.model(**obj_in_data)  # type: ignore
                      db.add(db_obj)
                      db.commit()
                      db.refresh(db_obj)

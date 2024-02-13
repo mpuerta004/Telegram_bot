@@ -25,8 +25,7 @@ class Last_user_positionUpdate(Last_user_positionBase):
 
 
 class Last_user_positionInDBBase(Last_user_positionBase):
-    id: int = None
-    
+    pass    
     class Config:
         orm_mode = True
 

@@ -10,11 +10,13 @@ from folium import plugins
 # from IPython.display import display
 import csv
 import math
+from fastapi import FastAPI, APIRouter, Query, HTTPException, Request, Depends
+
 from math import asin, atan2, cos, degrees, radians, sin, sqrt
 
 # #https://api.telegram.org/bot<TU_TOKEN/getUpdates
 # #https://api.telegram.org/bot<TU_TOKEN>/getMe
-api_url= 'http://localhost:8001'
+api_url= 'http://mve:8001'
 headers = {
     'Accept': 'application/json',
     'Content-Type': 'application/json'

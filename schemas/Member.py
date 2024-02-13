@@ -25,6 +25,7 @@ class MemberBase(BaseModel):
 
 # Properties to receive via API on creation
 class MemberCreate(MemberBase):
+    id:int
     pass
     
 
