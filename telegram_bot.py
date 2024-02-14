@@ -83,19 +83,13 @@ def start(message):
     peticion = api_url + f'/members/{message.chat.id}'
     try:
         response = requests.get(peticion, headers=headers)
-        # If the answer is 200 -> the user is already in the database
         # CASE (user exists in the database).
         if response.status_code == 200:
             data = response.json()  # data -> user information -> Member
-            # engine = create_db_engine()
-            # db = create_db_session(engine)
-            # Member= MemberCreate(id=message.chat.id, name=str(message.chat.first_name),surname="",age=0, gender="NOANSWER", city="", mail=message.chat.username, birthday=datetime.datetime.now())
-            # crud.member.create_member(db=db, obj_in=Member)
             bot.send_message(message.chat.id, f"Hello {message.chat.first_name}! Welcome back!")
             bot.send_message(message.chat.id, message_goal_of_the_system)
             bot.send_message(message.chat.id, message_info_interaction)
             bot.send_message(message.chat.id, message_change_personal_information)
-            # db.close()
         # CASE (user dont exists in the database).
         else:
             data=bot_auxiliar.add_user(message=message)
@@ -111,24 +105,28 @@ def start(message):
                         bot.send_message(message.chat.id, message_goal_of_the_system)
                         bot.send_message(message.chat.id, message_info_interaction)
                         bot.send_message(message.chat.id, message_change_personal_information)
+                        # Insert the user in the telegram_bot_db
                         engine = create_db_engine()
                         db = create_db_session(engine)
                         Member= MemberCreate(id=message.chat.id, name=message.chat.first_name,surname="",age=0, gender="NOANSWER", city="", mail=message.chat.username, birthday=datetime.datetime.now())
                         crud.member.create_member(db=db, member=Member)
                         db.close()
                     else:
-                        print(
-                                f"Error en la solicitud. Código de respuesta: {response.status_code}")       
+                        print(f"Error en la solicitud. Código de respuesta: {response.status_code}") 
+                        bot.send_message(message.chat.id,"Error with the system. please contact with @Maite314. Wait few minutes and try again.")
+     
                 else:
-                        print(
-                                f"Error en la solicitud. Código de respuesta: {response.status_code}")       
+                        print(f"Error en la solicitud. Código de respuesta: {response.status_code}")  
+                        bot.send_message(message.chat.id,"Error with the system. please contact with @Maite314. Wait few minutes and try again.")
+     
             else:
-                print(f"Error en la solicitud. Código de respuesta: {response.status_code}")    
-                        
-                
+                print(f"Error en la solicitud. Código de respuesta: {response.status_code}")
+                bot.send_message(message.chat.id,"Error with the system. please contact with @Maite314. Wait few minutes and try again.")
+    
+                                 
     except Exception as e:
         print("Error durante la conexion con la base de datos:", e)
-        bot.send_message(message.chat.id,"Error with the system")
+        bot.send_message(message.chat.id,"Error with the system. please contact with @Maite314")
         return None
     
            
@@ -346,7 +344,7 @@ def set_mail(message):
 
 
 @bot.message_handler(commands=['setbirthday'])
-def set_gender(message):
+def set_birthday(message):
 
     # Obtiene el nombre enviado por el usuario
     birthday = message.text.replace('/setbirthday', '').strip()
@@ -621,68 +619,120 @@ def set_city(message):
             print("Error durante la solicitud:", e)
 
 
+
 # Envia una ubicación para pedir la recomendación!
-@bot.message_handler(commands=['recommendation', 'measurement'])
-def recibir_localizacion(message):
-    markup = types.ReplyKeyboardMarkup(row_width=1)
-    location_btn = types.KeyboardButton(
-        "Share location", request_location=True)
-    markup.add(location_btn)
-    bot.send_message(message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
+@bot.message_handler(commands=['recommendation'])
+def recommendation(message):
     engine = create_db_engine()
     db = create_db_session(engine)
-    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-    db.commit()
-    if last_user_position != None:
-        crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+    member=crud.member.get_by_id(db=db, id=message.chat.id)
+    member_2 = bot_auxiliar.existe_user(id_user=message.chat.id)
+    if member != None and member_2 != None:
+        
+        markup = types.ReplyKeyboardMarkup(row_width=1)
+        location_btn = types.KeyboardButton("Share location", request_location=True)
+        markup.add(location_btn)
+        bot.send_message(message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
+        #in the case we have the last position we delete this information! 
+        last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
         db.commit()
+        if last_user_position != None:
+            crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+            db.commit()
+        # Elimino las recomendaciones pasadas. 
+        list_recomendation= crud.redcomendation.get_All_Recommendation(db=db, member_id=message.chat.id)
+        for i in list_recomendation:
+            crud.recomendation.remove(db=db, recommendation=i)
+    else: 
+        bot.reply_to(message, "Please first send the comand /start to be in the database. Thanks you! ")
+    db.close()
+    
+
+
+# Envia una ubicación para pedir la recomendación!
+@bot.message_handler(commands=['measurement'])
+def measurement(message):
+    engine = create_db_engine()
+    db = create_db_session(engine)
+    member=crud.member.get_by_id(db=db, id=message.chat.id)
+    member_2 = bot_auxiliar.existe_user(id_user=message.chat.id)
+    if member != None and member_2 != None:
+        #Hemos verificado que el usuario existe:
+        #TODO! verificar que es None el resultado que sale 
+        recomendacion_aceeptada= crud.recommendation.get_recommendation_to_measurement(db=db, member_id=message.chat.id)
+        if recomendacion_aceeptada != None: 
+            #in the case we have the last position we delete this information! 
+            last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+            db.commit()
+            if last_user_position != None:
+                crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+                db.commit()
+            #Le pido al usuario la localizacion. 
+            markup = types.ReplyKeyboardMarkup(row_width=1)
+            location_btn = types.KeyboardButton("Share location", request_location=True)
+            markup.add(location_btn)
+            bot.send_message(message.chat.id, "The first step is to share your location. Please press the button to do so", reply_markup=markup)
+        else:
+            bot.reply_to(message, "You do not have any accepted recommendations, please use the /recommendation command before performing this command.")
+    else: 
+        bot.reply_to(message, "Please first send the comand /start to be in the database. Thanks you! ")
     db.close()
     
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
     user = bot_auxiliar.existe_user(message.chat.id)
-    if user is not None:
+    if user != None:
+        #Volvemos a eliminar la localizacion anterior aunque no deberia ser necesario.
+        #De etse modo nos aseguramos que solo hay una!  
         engine = create_db_engine()
-        db = create_db_session(engine)        
+        db = create_db_session(engine)  
+        last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+        if last_user_position !=None:
+            crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+            db.commit()
         last_location_of_user= Last_user_positionCreate(member_id=message.chat.id, location={
                 'Longitude': message.location.longitude, 'Latitude': message.location.latitude})
         crud.last_user_position.create_last_user_position(db=db, obj_in=last_location_of_user)
-        db.close()
 
-        info = {
+        
+        rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
+        # El usuario tiene recomendaciones aceptadas!
+        if rec != None:
+            #Elimino las recomendaciones que no son la aceptada. 
+            list_notified_recommendation=crud.recommendation.get_recommendation_notified(db=db, member_id=message.chat.id)
+            for i in list_notified_recommendation:
+                crud.recommendation.remove(db=db, recommendation=i)
+            bot.reply_to(message, "It's time for you to send the photo! Plese send to me the photo to integrate it in the collague.")
+            
+        else:
+            #Eliminamos las enteriores en caso de existir
+            list_recommendation=crud.recommendation.get_All_Recommendation(db=db, member_id=message.chat.id)
+            if list_recommendation !=None:
+                for i in list_recommendation:
+                    crud.recommendation.remove(db=db, recommendation=i)
+            # En caso de no tener ninguna recomendacion aceptada -> creamos nuevas recomendaciones y eliminamos las anteriores. 
+            campaign = bot_auxiliar.get_campaign_hive_1(message.chat.id)
+            if campaign is not None:
+                campaign_id = campaign['id'] 
+                info = {
             "member_current_location": {
                 "Longitude": message.location.longitude,
                 "Latitude": message.location.latitude
-            }}
-        rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
-        # El usuario tiene recomendaciones aceptadas!
-        if rec is not None:
-            bot.reply_to(message, "It's time for you to send the photo! Plese send to me the photo to integrate in the collague.")
-            
-        else:
-            # En caso de no tener ninguna recomendacion aceptada -> creamos una.
-            campaign = bot_auxiliar.get_campaign_hive_1(message.chat.id)
-            if campaign is not None:
-                campaign_id = campaign['id']
-                # engine = create_db_engine()
-                # db = create_db_session(engine)  
+            }} 
                 data = bot_auxiliar.recomendacion(
                     id_user=message.chat.id, campaign_id=campaign_id, info=info)
                 if data is not None and data!={"detail": "Incorrect_user_campaign"} and data != {'detail': 'far_away'} and data != {'details': 'Incorrect_user_role'} and data != {"detail": "no_measurements_needed"}:
-                    # Eliminamos los datos anteriores guardados
-                    engine = create_db_engine()
-                    db = create_db_session(engine)  
-                    for i in data['results']:
-                        recomendation= RecommendationCreate(id=i['recommendation']['id'], posicion=int(i)+1, state="NOTIFIED")
+                    # Metemos en nuestra base de datos las recomendaciones que nos han dado.
+                    for i in range(0,len(data['results'])):
+                        recomendation= RecommendationCreate(id=data['results'][i]['recommendation']['id'],member_id=message.chat.id, posicion=str(i), state="NOTIFIED")
                         crud.recommendation.create_recommendation(db=db, obj_in=recomendation)
-                    db.close()
                     # TODO! ExTEPCIONES
                     if len(data['results']) == 0:
                         bot.send_message(
                             message.chat.id, "There are no recommendations for you at this time. We're sorry.")
+                        crud.last_user_position.remove(db=db,Last_user_position=last_location_of_user)
                     elif len(data['results']) == 1:
                         markup = types.ReplyKeyboardMarkup(row_width=1)
-                        # - lat {data['results'][0]['cell']['centre']['Latitude']} long{data['results'][0]['cell']['centre']['Longitude']}")
                         option1 = types.KeyboardButton(f"Option 1")
                         markup.add(option1)
                         bot.send_message(
@@ -727,13 +777,6 @@ def handle_location(message):
                                           'centre']['Latitude'], longitude=data['results'][2]['cell']['centre']['Longitude'])
                         bot.send_message(
                             message.chat.id, "Please choose from the menu where you want to take the photo.", reply_markup=markup)
-                    engine = create_db_engine()
-                    db = create_db_session(engine)                    
-                    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-                    if last_user_position !=None:
-                        crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
-                    db.close()
-                
                 else:
                     bot.reply_to(
                         message, "There are no possible recommendations for you at this time. We're sorry.")
@@ -741,57 +784,55 @@ def handle_location(message):
                 bot.reply_to(
                     message, "There are no active campaigns near you. We're sorry.")
     else:
-        bot.send_message(
-            message.chat.id, "There is an issue, please send the \start command. Thank you!")
+        bot.reply_to(message, "Please first send the comand /start to be in the database. Thanks you! ")
+
+    db.close()
 
 
 # Dada la eleccion del usuario almacenamos su eleccion en la base de datos.
 @bot.message_handler(func=lambda message: message.text == "Option 1" or message.text == "Option 2" or message.text == "Option 3")
 def handle_option(message):
     user_choice = message.text
-    if last_recomendation_per_user[message.chat.id] is not None:
-        # Asegurate que sigue activa la recomendacion es decir si tiene aceptadas y no las ha realizado hay que corregiirlo.
-        number = message.text.replace('Option ', '').strip()
-        if int(number) != 1 and int(number)!= 2 and int(number) != 3:
-            bot.reply_to(
-                message, "Please choose a valid option from the menu. For example: 'Option 1', 'Option 2', or 'Option 3'. Or send a text with this information.")
-        else:
-            # Registramos la recomendacion aceptada que tiene el usuario. 
-            recommendation_id = recomendacion_info['recommendation']['id']
-            peticion = api_url + \
-                f"/members/{message.chat.id}/recommendations/{recommendation_id}"
-            info = "ACCEPTED"
-            try:
-                # Se registramos la recomendacion acceptada por el usuario.
-                response = requests.patch(peticion, headers=headers, json=info)
-                if response.status_code == 200:
-                    data = response.json()
-                    bot.reply_to(message,
-                        f"You chose {user_choice}. Thanks for your choice. When you're at the location, please type the /measurement command and follow the instructions. then we will ask your location again and a picture in this place.")
-                    #Eliminamos la  ultima poscion del usuario! Porque aqui tiene que volver a enviarnosla cuando llegue al lugar. 
-                    engine = create_db_engine()
-                    db = create_db_session(engine)
-                    last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-                    if last_user_position != None :
-                        crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
-                    recomendacion_aceepted=crud.recommendation.get_recommendation_for_position(db=db, member_id=message.chat.id, position=number)
-                    crud.recommendation.update(db=db, db_obj=recomendacion_aceepted, obj_in={"state":"ACCEPTED"})
-                    db.close()
-<<<<<<< HEAD
-=======
-                    
->>>>>>> fd60404673489bb4caafcdc624b606bfea08760b
+    engine = create_db_engine()
+    db = create_db_session(engine)
+    member=crud.member.get_by_id(db=db, id=message.chat.id)
+    member_2 = bot_auxiliar.existe_user(id_user=message.chat.id)
+    if member != None and member_2 != None:
+        #En caso de tener almacenada la posicion del usuario la eliminamos.
+        last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
+        if last_user_position != None :
+            crud.last_user_position.remove(db=db,Last_user_position=last_user_position)
+        
+        list_recomendation=crud.recommendation.get_All_Recommendation(db=db, member_id=message.chat.id)
+        if list_recomendation != None:
+            #llegado a este punto sabemos que el usuario ha dado position y que tiene recomendaciones aqui debe aceptar alguna. 
+            #Nos aseguramos de que no tiene ninguna recomendacion activa:
+            accepted_recomendation=crud.recommendation.get_recommendation_to_measurement(db=db, member_id=message.chat.id)
+            if accepted_recomendation !=None:
+                bot.reply_to(message, "You have already accepted a recommendation in the follow location. Please send the photo to complete the process.")
+                recomendation= bot_auxiliar.recomendacion(id_user=message.chat.id, recomendation_id=  accepted_recomendation.id)
+                bot.send_location(message.chat.id, latitude=recomendation['cell']['centre']['Latitude'], longitude=recomendation['cell']['centre']['Longitude'])  
+            else:
+                number = message.text.replace('Option ', '').strip()
+                if int(number) != 1 and int(number)!= 2 and int(number) != 3:
+                    bot.reply_to(
+                        message, "Please choose a valid option from the menu. For example: 'Option 1', 'Option 2', or 'Option 3'. Or send a text with this information.")
                 else:
-                    print(
-                        f"Error en la solicitud de update de la recomendation. Código de respuesta: {response.status_code}")
-                    bot.reply_to(message.chat.id,"Please ask for a new recommendation.")
-            except Exception as e:
-                print("Error durante la solicitud:", e)
-                bot.reply_to(message.chat.id, "Error in the system. Please contact with @Maite314")
-
+                    rec=crud.recommendation.get_recommendation_for_position(db=db,member_id=message.chat.id,position=int(number)-1)
+                    # Registramos la recomendacion aceptada que tiene el usuario. 
+                    accepted_recomendation=bot_auxiliar.update_recomendation(member_id=message.chat.id, recomendation_id=rec.id)
+                    if accepted_recomendation != None:
+                        crud.recommendation.update(db=db, db_obj=rec, obj_in={"state":"ACCEPTED"})
+                        bot.reply_to(message,
+                                f"You chose {user_choice}. Thanks for your choice. When you're at the location, please type the /measurement command and follow the instructions. then we will ask your location again and a picture in this place.")       
+                    else:
+                            bot.reply_to(message.chat.id,"system error. Plase contact with @Maite314")
+        else:
+            bot.reply_to(
+                message, f"First please go the There are no recommendations for you at this time. We're sorry. Please request a recommendation.")
     else:
-        bot.reply_to(
-            message, f"First please go the There are no recommendations for you at this time. We're sorry. Please request a recommendation.")
+        bot.reply_to(message, "Please first send the comand /start to be in the database. Thanks you! ")
+    db.close()
 
 
 @bot.message_handler(content_types=['photo'])
@@ -800,9 +841,7 @@ def handle_photo_and_location(message):
     engine = create_db_engine()
     db = create_db_session(engine)
     last_user_position=crud.last_user_position.get_by_id(db=db, member_id=message.chat.id)
-    db.close()
-    if last_user_position !=None:
-        
+    if last_user_position != None:
         if message.photo:
             rec = bot_auxiliar.recomendaciones_aceptadas(message.chat.id)
             # El usuario tiene recomendaciones aceptadas!
@@ -812,13 +851,12 @@ def handle_photo_and_location(message):
             else:
                 # Aquí puedes acceder a la información de la foto
                 peticion = api_url + f"/members/{message.chat.id}/measurements"
-                posicion_user = last_location_of_user
                 date = datetime.datetime.utcnow()
                 measurement_creation = {
                     "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
                     "location": {
-                        "Longitude": posicion_user["member_current_location"]["Longitude"],
-                        "Latitude": posicion_user["member_current_location"]["Latitude"]
+                        "Longitude": last_user_position.location['Longitude'],
+                        "Latitude": last_user_position.location['Latitude']
                     },
                     "no2": 0,
                     "co2": 0,
@@ -936,6 +974,11 @@ def handle_photo_and_location(message):
                 else:
                     print(
                         f"Error en la solicitud de medicion. Código de respuesta: {response.status_code}")
+    db.close()
+
+
+
+
 
 def actualizar_repositorio():
     # Ejecutar el comando para agregar, hacer commit y hacer push del archivo HTML

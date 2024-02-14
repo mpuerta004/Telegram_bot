@@ -20,10 +20,10 @@ from crud.base import CRUDBase
 
 class CRUDRecommendation(CRUDBase[Recommendation, RecommendationCreate, RecommendationUpdate]):
         
-        def create_recommendation(self, db: Session, *, obj_in: RecommendationCreate, member_id:int,state:str, posicion:int,id:int) -> Recommendation:
+        def create_recommendation(self, db: Session, *, obj_in: RecommendationCreate) -> Recommendation:
                 try:
                         obj_in_data = jsonable_encoder(obj_in) 
-                        db_obj = self.model(**obj_in_data,member_id=member_id,state=state,posicion=position,id=id)  # type: ignore
+                        db_obj = self.model(**obj_in_data)  # type: ignore
                         db.add(db_obj)
                         db.commit()
                         db.refresh(db_obj)
@@ -52,11 +52,12 @@ class CRUDRecommendation(CRUDBase[Recommendation, RecommendationCreate, Recommen
                         return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id, Recommendation.state=="ACCEPTED")).first()
                 except Exception as e:
                         raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
-        def get_recommendation_all(self, db: Session, *, member_id:int) -> Recommendation:
+        def get_recommendation_notified(self, db: Session, *, member_id:int) -> List[Recommendation]:
                 try:
-                        return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id, Recommendation.state=="ACCEPTED")).first()
+                        return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id, Recommendation.state=="NOTIFIED")).first()
                 except Exception as e:
                         raise HTTPException(status_code=500, detail=f"Error with mysql {e}" )
+        
         def get_recommendation_for_position(self, db: Session, *, member_id:int,position:int) -> Recommendation:
                 try:
                         return db.query(Recommendation).filter( and_(Recommendation.member_id==member_id,Recommendation.posicion==position)).first()

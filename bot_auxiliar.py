@@ -155,6 +155,22 @@ def recomendacion(id_user:int,recomendation_id:int):
         print( f"Error with mysql {e}" )    
         return None
 
+def update_recomendation(id_user:int,recomendation_id:int):
+    peticion = api_url + \
+                        f"/members/{id_user}/recommendations/{recomendation_id}"
+    info = "ACCEPTED"
+    try:
+                        # Se registramos la recomendacion acceptada por el usuario.
+        response = requests.patch(peticion, headers=headers, json=info)
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            print("Error with the API")
+            return None
+    except Exception as e:
+        print( f"Error with mysql {e}" )    
+        return None
 
 def get_campaign_hive_1(id_user:int):
     peticion = api_url +"/hives/1/campaigns"
