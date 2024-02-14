@@ -171,6 +171,83 @@ def update_recomendation(id_user:int,recomendation_id:int):
     except Exception as e:
         print( f"Error with mysql {e}" )    
         return None
+def create_measurement(id_user:int, Latitud:float, Longitud:float):
+    peticion = api_url + f"/members/{id_user}/measurements"
+    date = datetime.datetime.utcnow()
+    measurement_creation = {
+                        "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
+                        "location": {
+                            "Longitude": Longitud,
+                            "Latitude": Latitud
+                        },
+                        "no2": 0,
+                        "co2": 0,
+                        "o3": 0,
+                        "so02": 0,
+                        "pm10": 0,
+                        "pm25": 0,
+                        "pm1": 0,
+                        "benzene": 0}
+    try:
+        response = requests.post( peticion, headers=headers, json=measurement_creation)
+        if response.status_code == 201:
+            data = response.json()
+            return data 
+        else:
+            print("Error with mysql")
+            return None
+    except Exception as e:
+        print( f"Error with mysql {e}" )
+        return None
+
+
+def get_surface():
+    peticion = api_url + f"/hives/1/campaigns/1/surfaces"
+    try:
+        # Se registramos la recomendacion acceptada por el usuario.
+        response = requests.get(peticion, headers=headers)
+        if response.status_code == 200:
+            # La solicitud fue exitosa
+            data = response.json()
+            return data 
+        else:
+            print("Error with mysql")
+            return None
+    except Exception as e:
+        print( f"Error with mysql {e}" )
+        return None
+
+
+def get_point(id_user:int, latitud:float, longuitud:float):
+    peticion = api_url + \
+                                f"/sync/get_location/{id_user}"
+    date = datetime.datetime.utcnow()
+    measurement_creation = {
+                                "datetime": date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                "location": {
+                                    "Longitude": longuitud,
+                                    "Latitude": latitud
+                                },
+                                "no2": 0,
+                                "co2": 0,
+                                "o3": 0,
+                                "so02": 0,
+                                "pm10": 0,
+                                "pm25": 0,
+                                "pm1": 0,
+                                "benzene": 0}
+    try:
+        response = requests.get(peticion, headers=headers, json=measurement_creation)
+        if response.status_code == 200:
+            data = response.json()
+            return data["Latitude"], data['Longitude']
+        else:
+            print("Error with mysql")
+            return None, None
+    except Exception as e:
+        print( f"Error with mysql {e}" )
+        return None, None        
+
 
 def get_campaign_hive_1(id_user:int):
     peticion = api_url +"/hives/1/campaigns"

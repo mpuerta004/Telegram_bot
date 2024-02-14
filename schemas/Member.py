@@ -20,12 +20,13 @@ class MemberBase(BaseModel):
     city: str=None
     mail:str
     birthday:datetime
+    id:int
+
     # device_id:int=None
 
 
 # Properties to receive via API on creation
 class MemberCreate(MemberBase):
-    id:int
     pass
     
 
@@ -35,8 +36,7 @@ class MemberUpdate(MemberBase):
 
 
 class MemberInDBBase(MemberBase):
-    id: int = None
-    
+    pass    
     class Config:
         orm_mode = True
 

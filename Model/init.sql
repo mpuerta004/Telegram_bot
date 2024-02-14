@@ -60,8 +60,9 @@ CREATE TABLE Recommendation (
     ON DELETE CASCADE
     );
 
--- CREATE Table Measurement(
---   url VARCHAR(100) not null,
---   position POINT, 
-
--- )
+CREATE Table Measurement(
+  url VARCHAR(100) not null,
+  location POINT, 
+  id BIGINT, 
+  PRIMARY KEY (id)
+)
