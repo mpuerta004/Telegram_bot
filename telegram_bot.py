@@ -22,11 +22,6 @@ import deps
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:mypasswd@mysql_bot:3306/Telegram_bot_db"
-# engine = create_engine(SQLALCHEMY_DATABASE_URL)
-# Session = sessionmaker(bind=engine)
-# session = Session()
-
 # Crear la conexión a la base de datos
 def create_db_engine():
     return create_engine('mysql+mysqlconnector://root:mypasswd@mysql_bot:3306/Telegram_bot_db')
@@ -41,7 +36,7 @@ from sqlalchemy.orm import Session
 from schemas.Member import MemberCreate, MemberUpdate, MemberSearchResults
 from schemas.Recommendation import RecommendationCreate, RecommendationUpdate, RecommendationSearchResults
 from schemas.last_user_position import Last_user_positionCreate, Last_user_positionUpdate, Last_user_positionSearchResults
-from shcemas.Measurement import MeasurementCreate, MeasurementUpdate, MeasurementSearchResults
+from schemas.Measurement import MeasurementCreate, MeasurementUpdate, MeasurementSearchResults
 
 # Ponemos nuestro Token generado con el @BotFather
 TOKEN = "6738738196:AAFVC0OT3RAv4PJvHsV4Vj9zYIlulIlnPLw"
@@ -924,9 +919,10 @@ def crear_mapa(message):
         #Este tiene que tener la localizacion y la recomendacion y la foto 
         engine = create_db_engine()
         db = create_db_session(engine)
-        measuerements =crud.measurement.get_All(db=db)
+        measuerements =crud.measurement.get_all(db=db)
         db.close()
         # Obtener el número de combinaciones diferentes de las dos primeras columnas
+        df = pd.DataFrame(measuerements)
         grupos = df.groupby(['latitud', 'longitud'])[
                         'url_imagen'].apply(list).reset_index()
         campaign=bot_auxiliar.get_campaign_hive_1(id_user=message.chat.id)
