@@ -877,10 +877,8 @@ def handle_photo_and_location(message):
 
                         else:
                             bot.reply_to(message, "Yout position is out of the campaign. Please send the location at the point you agreed.")
-                               
 
                     else:
-                        
                         
                         elements=crud.recommendation.get_All_Recommendation(db=db, member_id=message.chat.id)
                         for i in elements['results']:
